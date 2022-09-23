@@ -1,0 +1,22 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    font-family: ArtifaktElement; /* Will be added by Forge Viewer */
+}
+
+#viewport1,
+#viewport2 {
+    position: absolute;
+    height: 100%;
+    width: 50%;
+    z-index: 0;
+}
+
+#viewport1 {
+    left: 0;
+}
+
+#viewport2 {
+    right: 0;
+}

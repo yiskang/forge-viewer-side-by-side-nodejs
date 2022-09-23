@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.css">
+    <link rel="stylesheet" href="/main.css">
+    <title>Autodesk Forge: Viewer Side-By-Side</title>
+</head>
+
+<body>
+    <div id="viewport1"></div>
+    <div id="viewport2"></div>
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
+    <script>
+        const MODEL_URN_1 = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6c2FuZGJveC9yYWNfYmFzaWNfc2FtcGxlX3Byb2plY3RfdjEucnZ0';
+        const MODEL_URN_2 = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6c2FuZGJveC9yYWNfYmFzaWNfc2FtcGxlX3Byb2plY3RfdjIucnZ0';
+        let viewer1, viewer2;
+
+        const options = {
+            getAccessToken: async function (callback) {
+                const resp = await fetch('/api/auth/token');
+                if (resp.ok) {
+                    const token = await resp.json();
+                    callback(token.access_token, token.expires_in);
+                } else {
+                    throw new Error(await resp.text());
+                }
+            }
+        };
+
+        Autodesk.Viewing.Initializer(options, async function () {
+            viewer1 = new Autodesk.Viewing.GuiViewer3D(document.getElementById('viewport1'));
+            viewer2 = new Autodesk.Viewing.GuiViewer3D(document.getElementById('viewport2'));
+
+            viewer1.start();
+            viewer2.start();
+            const tasks = [];
+            tasks.push(loadModel(viewer1, MODEL_URN_1));
+            tasks.push(loadModel(viewer2, MODEL_URN_2))
+            await Promise.all(tasks);
+
+            // Uncomment either the below event handler to enable the camera-sync behavior, but don't uncomment both of them together.
+            viewer1.addEventListener(Autodesk.Viewing.CAMERA_CHANGE_EVENT, function (event) {
+                if (!event) return;
+
+                let { camera } = event;
+                let view = {
+                    aspect: camera.aspect,
+                    isPerspective: camera.isPerspective,
+                    fov: camera.fov,
+                    position: camera.position.clone(),
+                    target: camera.target.clone(),
+                    up: camera.up.clone(),
+                    orthoScale: camera.orthoScale
+                };
+
+                let inverseOffsetMatrix = viewer1.model.getInverseModelToViewerTransform();
+                let offsetMatrix = viewer2.model.getModelToViewerTransform();
+                view.position = view.position.applyMatrix4(inverseOffsetMatrix).applyMatrix4(offsetMatrix);
+                view.target = view.target.applyMatrix4(inverseOffsetMatrix).applyMatrix4(offsetMatrix);
+                viewer2.impl.setViewFromCamera(view);
+            });
+
+            // viewer2.addEventListener(Autodesk.Viewing.CAMERA_CHANGE_EVENT, function (event) {
+            //     if (!event) return;
+
+            //     let { camera } = event;
+            //     let view = {
+            //         aspect: camera.aspect,
+            //         isPerspective: camera.isPerspective,
+            //         fov: camera.fov,
+            //         position: camera.position.clone(),
+            //         target: camera.target.clone(),
+            //         up: camera.up.clone(),
+            //         orthoScale: camera.orthoScale
+            //     };
+
+            //     let inverseOffsetMatrix = viewer2.model.getInverseModelToViewerTransform();
+            //     let offsetMatrix = viewer1.model.getModelToViewerTransform();
+            //     view.position = view.position.applyMatrix4(inverseOffsetMatrix).applyMatrix4(offsetMatrix);
+            //     view.target = view.target.applyMatrix4(inverseOffsetMatrix).applyMatrix4(offsetMatrix);
+            //     viewer1.impl.setViewFromCamera(view);
+            // });
+        });
+
+        async function loadModel(viewer, urn, guid) {
+            return new Promise(function (resolve, reject) {
+                function onDocumentLoadSuccess(doc) {
+                    Autodesk.Viewing.Document.getAecModelData(doc.getRoot()).then(aec => console.log('AEC metadata', aec));
+                    resolve(viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()));
+                }
+                function onDocumentLoadFailure(code, message) {
+                    console.error('Could not load document.', message);
+                    reject(message);
+                }
+                Autodesk.Viewing.Document.load('urn:' + urn, onDocumentLoadSuccess, onDocumentLoadFailure);
+            });
+        }
+    </script>
+</body>
+
+</html>
